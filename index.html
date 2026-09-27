@@ -1,56 +1,467 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Orçamento Doméstico do Macário</title>
+<title>Orçamento Doméstico do Macário</title>
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f6f8;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
-        }
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
-        h1 {
-            color: #17365d;
-        }
+<style>
 
-        .card {
-            background: white;
-            padding: 25px;
-            border-radius: 12px;
-            max-width: 500px;
-            margin: 30px auto;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
-        }
+* {
+    box-sizing: border-box;
+}
 
-        .valor {
-            font-size: 30px;
-            color: #16803c;
-            font-weight: bold;
-        }
-    </style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f3f8;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 850px;
+    margin: 40px auto;
+}
+
+h1 {
+    color: #17365d;
+    text-align: center;
+}
+
+.card {
+    background: white;
+    border-radius: 14px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+}
+
+input {
+    width: 100%;
+    padding: 14px;
+    margin: 8px 0;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+}
+
+button {
+    background: #17365d;
+    color: white;
+    border: none;
+    padding: 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover {
+    background: #24558a;
+}
+
+.login button {
+    width: 100%;
+    margin-top: 12px;
+}
+
+.valor {
+    color: #16803c;
+    font-size: 32px;
+    font-weight: bold;
+}
+
+.erro {
+    color: #c62828;
+}
+
+#painel {
+    display: none;
+}
+
+#login {
+    display: none;
+}
+
+.lancamento {
+    padding: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.data {
+    color: #666;
+    font-size: 13px;
+}
+
+</style>
+
 </head>
 
 <body>
 
-    <h1>Orçamento Doméstico do Macário</h1>
+<div class="container">
 
-    <div class="card">
-        <h2>Bem-vindo ao seu controle financeiro!</h2>
+<h1>Orçamento Doméstico do Macário</h1>
 
-        <p>Seu aplicativo de receitas e despesas.</p>
+<div class="card login" id="login">
 
-        <h3>Receita mensal planejada do PROCON</h3>
+<h2>Acesso ao seu orçamento</h2>
 
-        <p class="valor">R$ 2.100,00</p>
+<p>Entre com seu e-mail e senha.</p>
 
-        <p>Em breve, suas informações serão carregadas automaticamente do Supabase.</p>
-    </div>
+<input
+    type="email"
+    id="email"
+    placeholder="Seu e-mail"
+    autocomplete="username"
+>
+
+<input
+    type="password"
+    id="senha"
+    placeholder="Sua senha"
+    autocomplete="current-password"
+>
+
+<button onclick="entrar()">Entrar</button>
+
+<p id="mensagemLogin" class="erro"></p>
+
+</div>
+
+<div id="painel">
+
+<div class="card">
+
+<h2>Bem-vindo ao seu controle financeiro!</h2>
+
+<p>Suas informações são carregadas do Supabase.</p>
+
+<button onclick="sair()">Sair da conta</button>
+
+</div>
+
+<div class="card">
+
+<h2>Total de receitas cadastradas</h2>
+
+<p class="valor" id="totalReceitas">Carregando...</p>
+
+</div>
+
+<div class="card">
+
+<h2>Receitas</h2>
+
+<div id="listaReceitas">Carregando receitas...</div>
+
+</div>
+
+<div class="card">
+
+<h2>Despesas</h2>
+
+<div id="listaDespesas">Carregando despesas...</div>
+
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+// CONFIGURAÇÃO DO SUPABASE
+
+const SUPABASE_URL = "https://jbglqcaeopuznaxmiuss.supabase.co";
+
+const SUPABASE_KEY = "sb_publishable_sU-QdaTiWD_nRiqHz5lHLw_juyjRG8F";
+
+const banco = supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_KEY
+);
+
+// FORMATAR DINHEIRO
+
+function dinheiro(valor) {
+
+    return Number(valor || 0).toLocaleString(
+        "pt-BR",
+        {
+            style: "currency",
+            currency: "BRL"
+        }
+    );
+
+}
+
+// FORMATAR DATA
+
+function formatarData(data) {
+
+    if (!data) return "";
+
+    const partes = String(data).split("-");
+
+    if (partes.length !== 3) return String(data);
+
+    return partes[2] + "/" + partes[1] + "/" + partes[0];
+
+}
+
+// LOCALIZAR COLUNAS DO BANCO
+
+function campo(registro, nomes) {
+
+    for (const nome of nomes) {
+
+        if (registro[nome] !== undefined) {
+            return registro[nome];
+        }
+
+    }
+
+    return "";
+
+}
+
+// LOGIN
+
+async function entrar() {
+
+    const email = document.getElementById("email").value.trim();
+
+    const senha = document.getElementById("senha").value;
+
+    const mensagem = document.getElementById("mensagemLogin");
+
+    mensagem.textContent = "Entrando...";
+
+    const { error } = await banco.auth.signInWithPassword({
+
+        email: email,
+        password: senha
+
+    });
+
+    if (error) {
+
+        mensagem.textContent =
+            "Não foi possível entrar. Confira seu e-mail e sua senha.";
+
+        return;
+
+    }
+
+    document.getElementById("senha").value = "";
+
+    mensagem.textContent = "";
+
+    await mostrarPainel();
+
+}
+
+// SAIR
+
+async function sair() {
+
+    await banco.auth.signOut();
+
+    document.getElementById("painel").style.display = "none";
+
+    document.getElementById("login").style.display = "block";
+
+}
+
+// CARREGAR PAINEL
+
+async function mostrarPainel() {
+
+    document.getElementById("login").style.display = "none";
+
+    document.getElementById("painel").style.display = "block";
+
+    await carregarReceitas();
+
+    await carregarDespesas();
+
+}
+
+// RECEITAS
+
+async function carregarReceitas() {
+
+    const lista = document.getElementById("listaReceitas");
+
+    const total = document.getElementById("totalReceitas");
+
+    const { data, error } = await banco
+        .from("Receitas")
+        .select("*");
+
+    if (error) {
+
+        lista.textContent =
+            "Erro ao carregar receitas: " + error.message;
+
+        total.textContent = "Indisponível";
+
+        return;
+
+    }
+
+    lista.replaceChildren();
+
+    let soma = 0;
+
+    for (const receita of data) {
+
+        const descricao = campo(
+            receita,
+            ["Descrição", "descricao", "Descricao"]
+        );
+
+        const valor = campo(
+            receita,
+            ["Valor", "valor"]
+        );
+
+        const dataReceita = campo(
+            receita,
+            ["Data", "data"]
+        );
+
+        soma += Number(valor || 0);
+
+        const item = document.createElement("div");
+
+        item.className = "lancamento";
+
+        const titulo = document.createElement("strong");
+
+        titulo.textContent = descricao;
+
+        const quantia = document.createElement("p");
+
+        quantia.textContent = dinheiro(valor);
+
+        const dataTexto = document.createElement("span");
+
+        dataTexto.className = "data";
+
+        dataTexto.textContent = formatarData(dataReceita);
+
+        item.append(titulo, quantia, dataTexto);
+
+        lista.appendChild(item);
+
+    }
+
+    total.textContent = dinheiro(soma);
+
+    if (data.length === 0) {
+
+        lista.textContent = "Nenhuma receita cadastrada.";
+
+    }
+
+}
+
+// DESPESAS
+
+async function carregarDespesas() {
+
+    const lista = document.getElementById("listaDespesas");
+
+    const { data, error } = await banco
+        .from("Despesas")
+        .select("*");
+
+    if (error) {
+
+        lista.textContent =
+            "Erro ao carregar despesas: " + error.message;
+
+        return;
+
+    }
+
+    lista.replaceChildren();
+
+    for (const despesa of data) {
+
+        const descricao = campo(
+            despesa,
+            ["Descrição", "descricao", "Descricao"]
+        );
+
+        const valor = campo(
+            despesa,
+            ["Valor", "valor"]
+        );
+
+        const dataDespesa = campo(
+            despesa,
+            ["Data", "data"]
+        );
+
+        const item = document.createElement("div");
+
+        item.className = "lancamento";
+
+        const titulo = document.createElement("strong");
+
+        titulo.textContent = descricao;
+
+        const quantia = document.createElement("p");
+
+        quantia.textContent = dinheiro(valor);
+
+        const dataTexto = document.createElement("span");
+
+        dataTexto.className = "data";
+
+        dataTexto.textContent = formatarData(dataDespesa);
+
+        item.append(titulo, quantia, dataTexto);
+
+        lista.appendChild(item);
+
+    }
+
+    if (data.length === 0) {
+
+        lista.textContent = "Nenhuma despesa cadastrada.";
+
+    }
+
+}
+
+// VERIFICAR LOGIN EXISTENTE
+
+async function iniciar() {
+
+    const { data } = await banco.auth.getSession();
+
+    if (data.session) {
+
+        await mostrarPainel();
+
+    } else {
+
+        document.getElementById("login").style.display = "block";
+
+    }
+
+}
+
+iniciar();
+
+</script>
 
 </body>
 </html>
