@@ -6,12 +6,17 @@
   <meta name="theme-color" content="#123a32">
   <title>Orçamento Doméstico do Macário</title>
   <link rel="stylesheet" href="style.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script defer src="bootstrap.js"></script>
+  <script id="supabaseSdk" defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
   <main class="shell">
     <header class="brand"><span class="brand-icon" aria-hidden="true">M</span><div><strong>Orçamento Doméstico</strong><small>do Macário</small></div></header>
+    <section id="inicializacao" class="login-card" role="status" aria-live="polite">
+      <p id="mensagemInicializacao">Preparando seu orçamento...</p>
+      <button id="tentarInicializacao" class="primary" type="button" hidden>Tentar novamente</button>
+    </section>
     <section id="login" class="login-card" hidden>
       <div class="eyebrow">SEU ESPAÇO FINANCEIRO</div>
       <h1>Bom ter você de volta.</h1>
@@ -19,7 +24,7 @@
       <form id="loginForm">
         <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
         <label>Senha<input id="senha" type="password" autocomplete="current-password" required></label>
-        <button class="primary" type="submit">Entrar no orçamento</button>
+        <button id="entrar" class="primary" type="submit">Entrar no orçamento</button>
       </form>
       <p id="mensagemLogin" class="feedback" role="alert"></p>
     </section>
@@ -28,16 +33,18 @@
       <div class="topline"><div><div class="eyebrow">VISÃO GERAL</div><h1>Meu orçamento</h1><p>Receitas, despesas e prioridades em um só lugar.</p></div><button id="sair" class="ghost" type="button">Sair da conta</button></div>
       <div class="toolbar"><label for="mes">Período</label><input id="mes" type="month"><button id="mesAtual" class="ghost" type="button">Mês atual</button><button id="atualizar" class="ghost" type="button">Atualizar</button></div>
       <p id="mensagem" class="feedback" role="status" aria-live="polite"></p>
+      <button id="revisarGravacao" class="ghost" type="button" hidden>Já conferi os lançamentos</button>
       <div class="metrics"><article class="metric"><span>Receitas do mês</span><strong id="totalReceitas">—</strong><small>Entradas registradas</small></article><article class="metric"><span>Despesas do mês</span><strong id="totalDespesas">—</strong><small>Saídas registradas</small></article><article class="metric featured"><span>Saldo do mês</span><strong id="saldo">—</strong><small>Receitas menos despesas</small></article></div>
       <div class="main-grid"><section class="card entry-card"><div class="section-head"><div><div class="eyebrow">NOVO LANÇAMENTO</div><h2 id="formTitle">Adicionar lançamento</h2></div></div>
         <div class="switch" role="group" aria-label="Tipo de lançamento"><button type="button" id="tipoDespesa" class="active" aria-pressed="true">Despesa</button><button type="button" id="tipoReceita" aria-pressed="false">Receita</button></div>
-        <form id="lancamentoForm"><label>Descrição<input id="descricao" maxlength="150" placeholder="Ex.: Supermercado" required></label><div class="form-row"><label>Valor (R$)<input id="valor" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="0,00" required></label><label>Data<input id="data" type="date" required></label></div><label id="categoriaWrap">Categoria<select id="categoria"><option>Alimentação</option><option>Moradia</option><option>Transporte</option><option>Saúde</option><option>Educação</option><option>Lazer</option><option>Assinaturas</option><option>Família</option><option>Vestuário</option><option>Outros</option></select></label><div class="form-actions"><button id="salvar" class="primary" type="submit">Salvar despesa</button><button id="cancelar" class="ghost" type="button" hidden>Cancelar edição</button></div></form>
+        <form id="lancamentoForm"><label>Descrição<input id="descricao" maxlength="150" placeholder="Ex.: Supermercado" required></label><div class="form-row"><label>Valor (R$)<input id="valor" type="number" min="0.01" max="9999999999.99" step="0.01" inputmode="decimal" placeholder="0,00" required></label><label>Data<input id="data" type="date" required></label></div><label id="categoriaWrap">Categoria<select id="categoria"><option>Alimentação</option><option>Moradia</option><option>Transporte</option><option>Saúde</option><option>Educação</option><option>Lazer</option><option>Assinaturas</option><option>Família</option><option>Vestuário</option><option>Outros</option></select></label><div class="form-actions"><button id="salvar" class="primary" type="submit">Salvar despesa</button><button id="cancelar" class="ghost" type="button" hidden>Cancelar edição</button></div></form>
       </section><section class="card chart-card"><div class="section-head"><div><div class="eyebrow">DISTRIBUIÇÃO</div><h2>Despesas por categoria</h2></div></div><div id="graficoCategorias" class="bar-chart"></div></section></div>
       <section class="card"><div class="section-head"><div><div class="eyebrow">ÚLTIMOS MESES</div><h2>Evolução financeira</h2></div></div><div id="graficoEvolucao" class="trend-chart"></div><div class="legend"><span><i class="dot income"></i> Receitas</span><span><i class="dot expense"></i> Despesas</span></div></section>
       <section class="card"><div class="section-head"><div><div class="eyebrow">DETALHAMENTO</div><h2>Lançamentos do mês</h2></div><button id="exportar" class="ghost" type="button">Exportar CSV</button></div><div class="lists"><div><h3>Despesas <span id="contagemDespesas"></span></h3><div id="listaDespesas" class="items"></div></div><div><h3>Receitas <span id="contagemReceitas"></span></h3><div id="listaReceitas" class="items"></div></div></div></section>
       <footer>Os valores exibidos consideram os lançamentos registrados no período selecionado.</footer>
     </section>
   </main>
-  <dialog id="confirmacao"><form method="dialog"><h2>Excluir lançamento?</h2><p id="textoConfirmacao"></p><div class="form-actions"><button value="cancel" class="ghost">Cancelar</button><button value="confirm" class="danger">Excluir</button></div></form></dialog>
+  <dialog id="confirmacao"><form method="dialog"><h2>Excluir lançamento?</h2><p id="textoConfirmacao" data-financial-content></p><div class="form-actions"><button value="cancel" class="ghost">Cancelar</button><button value="confirm" class="danger">Excluir</button></div></form></dialog>
+  <dialog id="conferenciaGravacao"><form method="dialog"><h2>Conferiu os lançamentos?</h2><p id="textoConferencia" data-financial-content></p><label>Resultado da conferência<select id="resultadoConferencia" required><option value="">Selecione o resultado</option><option value="completed">Confirmei que a operação foi concluída</option><option value="not-completed">Confirmei que a operação não foi concluída</option><option value="uncertain">Ainda não tenho certeza</option></select></label><div class="form-actions"><button value="cancel" class="ghost" formnovalidate>Voltar à lista</button><button value="confirm" class="primary">Confirmar conferência</button></div></form></dialog>
 </body>
 </html>
